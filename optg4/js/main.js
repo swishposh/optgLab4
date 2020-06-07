@@ -60,7 +60,7 @@ function init()
         45, window.innerWidth / window.innerHeight, 1, 4000 );     
  
     // Установка позиции камеры     
-    camera.position.set(N/2, N/2, N*1.5);          
+    camera.position.set(N, N/2, N/0.8);          
     // Установка точки, на которую камера будет смотреть     
     camera.lookAt(new THREE.Vector3( N/2,  0.0, N/2));   
  
@@ -138,9 +138,9 @@ function init()
     GUI();
 
     
-    loadModel('models/house/', 'Cyprys_House.obj', 'Cyprys_House.mtl', 1, 'house')
-    loadModel('models/palma/', 'Palma001.obj', 'Palma001.mtl', 0.2, 'palma')
-    loadModel('models/grade/', 'grade.obj', 'grade.mtl', 1, 'grade')
+    loadModel('models/house/', 'Cyprys_House.obj', 'Cyprys_House.mtl', 3, 'house')
+    loadModel('models/palma/', 'Palma001.obj', 'Palma001.mtl', 0.5, 'palma')
+    loadModel('models/grade/', 'grade.obj', 'grade.mtl', 3, 'grade')
 
 }
 
@@ -422,7 +422,18 @@ function onDocumentMouseMove( event )
         if ( intersects.length > 0 )
         {
             if (selected != null)
+            {
                 selected.position.copy(intersects[0].point);
+
+                selected.userData.box.setFromObject(selected);
+                //получение позиции центра объекта
+                var pos = new THREE.Vector3();
+                selected.userData.box.getCenter(pos);
+
+                //selected.userData.cube.position.copy(intersects[0].point);
+                selected.userData.cube.position.copy(pos);
+            }
+                
         }
        
     }
@@ -457,7 +468,8 @@ function onDocumentMouseDown( event )
         // если луч пересёк какой-либо объект из списка targetList
         if ( intersects.length > 0 )
         {
-            selected = intersects[0].object.parent; // yf rnh vs gjgfkb rehcjhjv vsib
+            //selected = intersects[0].object.parent; // yf rnh vs gjgfkb rehcjhjv vsib
+            selected = intersects[0].object.userData.model;
             console.log(selected);
         }
     }
@@ -556,6 +568,32 @@ function addMesh (name)
 
     var model = models.get(name).clone();
 
-    objectList.push(model);
+    var box =  new THREE.Box3();
+    box.setFromObject(model);
+
+    model.userData.box = box;
+
+    var geometry = new THREE.BoxGeometry( 1, 1, 1 );
+    var material = new THREE.MeshBasicMaterial(
+        { color: 0xffff00, wireframe: true });
+    //object.userData.cube = new THREE.Mesh( geometry, material );
+    var cube = new THREE.Mesh( geometry, material );
+    scene.add( cube );
+
+    //получение позиции центра объекта
+    var pos = new THREE.Vector3();
+    box.getCenter(pos);
+    //получение размеров объекта
+    var size = new THREE.Vector3();
+    box.getSize(size);
+
+    //установка позиции и размера объекта в куб
+    cube.position.copy(pos);
+    cube.scale.set(size.x, size.y, size.z);
+    
+    model.userData.cube = cube;
+    cube.userData.model = model;
+
+    objectList.push(cube);
     scene.add(model);
 }
