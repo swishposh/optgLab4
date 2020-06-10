@@ -2,13 +2,17 @@
 var container; 
 
 var keyboard = new THREEx.KeyboardState(); 
+
+var loader = new THREE.TextureLoader();
  
 // Переменные "камера", "сцена" и "отрисовщик" 
-var camera, scene, renderer;
+var camera, scene, renderer, cameraOrtho, sceneOrtho;
 
 var geometry;
 
 var clock = new THREE.Clock();
+
+var sprite;
 
 var N = 256;
 
@@ -39,6 +43,8 @@ var objectList = [];
 
 var lmb = false;
 
+var sprt = null;
+
 
 
 // Функция инициализации камеры, отрисовщика, объектов сцены и т.д. 
@@ -54,7 +60,16 @@ function init()
     container = document.getElementById( 'container' );     
     // Создание "сцены"     
     scene = new THREE.Scene(); 
+    sceneOrtho = new THREE.Scene(); 
  
+    var width = window.innerWidth ;
+    var height = window.innerHeight;
+
+    //создание ортогональной камеры
+    cameraOrtho = new THREE.OrthographicCamera( - width / 2, width / 2, height / 2, -
+                                                height / 2, 1, 10 );
+    cameraOrtho.position.z = 10;
+
     // Установка параметров камеры     
     // 45 - угол обзора     
     // window.innerWidth / window.innerHeight - соотношение сторон     // 1 - 4000 - ближняя и дальняя плоскости отсечения     
@@ -79,6 +94,10 @@ function init()
  
     // Добавление функции обработки события изменения размеров окна     
     window.addEventListener( 'resize', onWindowResize, false );
+
+    //отключение авто очистки рендера
+    renderer.autoClear = false;
+
 
     renderer.domElement.addEventListener('mousedown',onDocumentMouseDown,false);
     renderer.domElement.addEventListener('mouseup',onDocumentMouseUp,false);
@@ -140,9 +159,15 @@ function init()
     GUI();
 
     
-    loadModel('models/house/', 'Cyprys_House.obj', 'Cyprys_House.mtl', 3, 'house')
-    loadModel('models/palma/', 'Palma001.obj', 'Palma001.mtl', 0.5, 'palma')
-    loadModel('models/grade/', 'grade.obj', 'grade.mtl', 3, 'grade')
+    loadModel('models/house/', 'Cyprys_House.obj', 'Cyprys_House.mtl', 3, 'house');
+    loadModel('models/palma/', 'Palma001.obj', 'Palma001.mtl', 0.5, 'palma');
+    loadModel('models/grade/', 'grade.obj', 'grade.mtl', 3, 'grade');
+
+    
+    //cameraOrtho.add(sprt);    
+    //updateHUDSprite(sprt);
+
+    addButtons();
 
 }
 
@@ -181,7 +206,7 @@ function terrainGen()
     geometry.computeFaceNormals();  
     geometry.computeVertexNormals();    
    
-    var loader = new THREE.TextureLoader();
+    
     var tex = loader.load( 'pics/grasstile.jpg' );
 
     tex.wrapS = tex.wrapT = THREE.RepeatWrapping;
@@ -208,8 +233,17 @@ function terrainGen()
 
 function onWindowResize()
 {
+    var width = window.innerWidth ;
+    var height = window.innerHeight;
+
     camera.aspect = window.innerWidth / window.innerHeight;
     camera.updateProjectionMatrix();
+
+    cameraOrtho.left = - width / 2;
+    cameraOrtho.right = width / 2;
+    cameraOrtho.top = - height / 2;
+    cameraOrtho.bottom = - height / 2;
+    cameraOrtho.updateProjectionMatrix();
 
     renderer.setSize( window.innerWidth, window.innerHeight );
 }
@@ -231,7 +265,11 @@ function animate()
 
 function render()
 {        
+    renderer.clear();
     renderer.render( scene, camera );
+
+    renderer.clearDepth();
+    renderer.render( sceneOrtho, cameraOrtho );
 }
 
 
@@ -363,6 +401,14 @@ function onDocumentMouseScroll( event )
 
 function onDocumentMouseMove( event ) 
 {
+    var mpos = {};
+
+    mpos.x = event.clientX -( window.innerWidth / 2 );
+    mpos.y = ( window.innerHeight / 2 ) - event.clientY;
+
+    if (sprt != null)
+        hitButton (mpos, sprt);
+
     //определение позиции мыши
     mouse.x = ( event.clientX / window.innerWidth ) * 2 - 1;
     mouse.y = -( event.clientY / window.innerHeight ) * 2 + 1;
@@ -844,4 +890,72 @@ function intersect(ob1, ob2)
     }
     // no separating axis exists, so the two OBB don't intersect
     return true;
+}
+
+
+function addSprite ( name1, name2 )
+{
+    var texture1 = loader.load(name1)
+    var material1 = new THREE.SpriteMaterial( { map: texture1 } );
+
+    var texture2 = loader.load(name2)
+    var material2 = new THREE.SpriteMaterial( { map: texture2 } );
+
+    //console.log(material);
+
+    //var width = material.map.image.width;
+    //var height = material.map.image.height;
+            
+    sprite = new THREE.Sprite( material1);
+    sprite.center.set( 0.0, 1.0 );
+    sprite.scale.set( 80, 64, 1 );
+    //sprite.position.set( 0, 0, 1 );
+
+    //return sprite;
+
+    sceneOrtho.add(sprite);
+    //cameraOrtho.add(sprite);
+    updateHUDSprite(sprite);
+
+    var SSprite = {};
+    SSprite.sprite = sprite;
+    SSprite.mat1 = material1;
+    SSprite.mat2 = material2;
+      
+
+    return SSprite;
+}
+
+
+//функция для обновления позиции спрайта
+function updateHUDSprite(sprite)
+{
+ var width = window.innerWidth / 2;
+ var height = window.innerHeight / 2;
+
+ sprite.position.set( -width, height, 1 ); // левый верхний угол экрана
+}
+
+function addButtons()
+{
+    sprt = addSprite ( 'pics/sprites/house.jpg', 'pics/sprites/house2.jpg' );
+}
+
+//moustPos = {x: 0, y:0}
+function hitButton( mPos, sprite)
+{
+    var pw = sprite.sprite.position.x;
+    var ph = sprite.sprite.position.y;
+    var sw = pw + sprite.sprite.scale.x;
+    var sh = ph - sprite.sprite.scale.y;
+
+    if (mPos.x > pw && mPos.x < sw)
+    {
+        if (mPos.y < ph && mPos.y > sh)
+        {
+            sprite.sprite.material = sprite.mat2;
+        }
+    }
+    else
+        sprite.sprite.material = sprite.mat1;
 }
