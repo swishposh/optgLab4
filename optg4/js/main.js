@@ -407,7 +407,11 @@ function onDocumentMouseMove( event )
     mpos.y = ( window.innerHeight / 2 ) - event.clientY;
 
     if (sprt != null)
+    {
         hitButton (mpos, sprt);
+        //clickButton (mpos, sprt);
+    }
+        
 
     //определение позиции мыши
     mouse.x = ( event.clientX / window.innerWidth ) * 2 - 1;
@@ -579,6 +583,18 @@ function onDocumentMouseUp( event )
         //selected = null;
 
         lmb = false;
+
+
+        var mpos = {};
+
+        mpos.x = event.clientX -( window.innerWidth / 2 );
+        mpos.y = ( window.innerHeight / 2 ) - event.clientY;
+
+        if (sprt != null)
+        {
+            hitButton (mpos, sprt);
+            clickButton (mpos, sprt);
+        }
     }
 }
 
@@ -893,7 +909,7 @@ function intersect(ob1, ob2)
 }
 
 
-function addSprite ( name1, name2 )
+function addSprite ( name1, name2, Click )
 {
     var texture1 = loader.load(name1)
     var material1 = new THREE.SpriteMaterial( { map: texture1 } );
@@ -921,6 +937,8 @@ function addSprite ( name1, name2 )
     SSprite.sprite = sprite;
     SSprite.mat1 = material1;
     SSprite.mat2 = material2;
+    //SSprite.click =  sprtClick;
+    SSprite.click =  Click;
       
 
     return SSprite;
@@ -938,7 +956,7 @@ function updateHUDSprite(sprite)
 
 function addButtons()
 {
-    sprt = addSprite ( 'pics/sprites/house.jpg', 'pics/sprites/house2.jpg' );
+    sprt = addSprite ( 'pics/sprites/house.jpg', 'pics/sprites/house2.jpg', houseClick );
 }
 
 //moustPos = {x: 0, y:0}
@@ -954,8 +972,30 @@ function hitButton( mPos, sprite)
         if (mPos.y < ph && mPos.y > sh)
         {
             sprite.sprite.material = sprite.mat2;
+            //console.log(hit);
         }
     }
     else
         sprite.sprite.material = sprite.mat1;
+}
+
+function clickButton( mPos, sprite)
+{
+    var pw = sprite.sprite.position.x;
+    var ph = sprite.sprite.position.y;
+    var sw = pw + sprite.sprite.scale.x;
+    var sh = ph - sprite.sprite.scale.y;
+
+    if (mPos.x > pw && mPos.x < sw)
+    {
+        if (mPos.y < ph && mPos.y > sh)
+        {
+            sprite.click();
+        }
+    }
+}
+
+function houseClick()
+{
+    addMesh('house');
 }
