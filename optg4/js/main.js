@@ -45,7 +45,12 @@ var lmb = false;
 
 var sprt = null;
 
-
+var g = new THREE.Vector3 (0, -9.8, 0); //gravitation
+var particles = [];
+var MAX_PARTICLES = 50000;
+var PARTICLES_PER_SECOND = 1000;
+var rainMAt = null;
+var wind = new THREE.Vector3 (55.0, 0.0, 0.0); //wind
 
 // Функция инициализации камеры, отрисовщика, объектов сцены и т.д. 
 init(); 
@@ -169,6 +174,14 @@ function init()
 
     addButtons();
 
+    //for (var i=0; i<10; i++)
+    //{
+       // var pos =new THREE.Vector4 (i*5, 20, N/2);
+       // addSprite('pics/sprites/avatan.png', pos);
+    //}
+
+    rainMAt = createSpriteMaterial('pics/sprites/avatan.png');
+
 }
 
 function terrainGen()
@@ -257,6 +270,9 @@ function animate()
     {
         sphereBrush(brushDirection, delta);
     }
+
+    emitter (delta);
+
     // Добавление функции на вызов, при перерисовки браузером страницы 
     requestAnimationFrame( animate ); 
 
@@ -909,7 +925,8 @@ function intersect(ob1, ob2)
 }
 
 
-function addSprite ( name1, name2, Click )
+//function addSprite ( name1, name2, Click )
+function addButton ( name1, name2, Click )
 {
     var texture1 = loader.load(name1)
     var material1 = new THREE.SpriteMaterial( { map: texture1 } );
@@ -956,7 +973,7 @@ function updateHUDSprite(sprite)
 
 function addButtons()
 {
-    sprt = addSprite ( 'pics/sprites/house.jpg', 'pics/sprites/house2.jpg', houseClick );
+    sprt = addButton ( 'pics/sprites/house.jpg', 'pics/sprites/house2.jpg', houseClick );
 }
 
 //moustPos = {x: 0, y:0}
@@ -998,4 +1015,137 @@ function clickButton( mPos, sprite)
 function houseClick()
 {
     addMesh('house');
+}
+
+function createSpriteMaterial (name)
+{
+    var texture = loader.load(name)
+    var material = new THREE.SpriteMaterial( { map: texture } );
+
+    return material;
+}
+
+function addSprite ( mat, pos, lifetime )
+{
+            
+    sprite = new THREE.Sprite( mat);
+    sprite.center.set( 0.5, 0.5 );
+    sprite.scale.set( 10, 10, 1 );
+
+    sprite.position.copy(pos);
+
+    scene.add(sprite);
+
+    var SSprite = {};
+    SSprite.sprite = sprite;
+    SSprite.v = new THREE.Vector3 (0, 0, 0);
+    SSprite.m = (Math.random() * 3) + 1;
+    SSprite.lifetime = lifetime;
+      
+    return SSprite;
+}
+
+/*
+function addSprite ( name, pos, lifetime )
+{
+    var texture = loader.load(name)
+    var material = new THREE.SpriteMaterial( { map: texture } );
+
+    //console.log(material);
+
+    //var width = material.map.image.width;
+    //var height = material.map.image.height;
+            
+    sprite = new THREE.Sprite( material);
+    sprite.center.set( 0.5, 0.5 );
+    sprite.scale.set( 10, 10, 1 );
+    //sprite.position.set( 0, 0, 1 );
+
+    //return sprite;
+
+    sprite.position.copy(pos);
+
+    scene.add(sprite);
+    //cameraOrtho.add(sprite);
+    //updateHUDSprite(sprite);
+
+    var SSprite = {};
+    SSprite.sprite = sprite;
+    //SSprite.mat1 = material1;
+    //SSprite.mat2 = material2;
+    //SSprite.click =  sprtClick;
+    //SSprite.click =  Click;
+    SSprite.v = new THREE.Vector3 (0, 0, 0);
+    SSprite.m = (Math.random() * 3) + 1;
+    SSprite.lifetime = lifetime;
+      
+
+    return SSprite;
+}
+*/
+
+
+
+function emitter (delta)
+{
+    // 1/60 - PARTICLES_PER_SECOND (100)
+
+    var current_particles = Math.ceil (PARTICLES_PER_SECOND * delta);
+
+
+    for (var i=0; i < current_particles; i ++)
+    {
+        if (particles.length < MAX_PARTICLES)
+        {
+            var x = Math.random()*N;
+            var z =Math.random()*N;
+    
+            var lifetime = (Math.random() * 2 ) + 3;
+    
+            //var pos =new THREE.Vector4 (i*5, 20, N/2);
+            var pos =new THREE.Vector4 (x, 70, z);
+            var particle = addSprite(rainMAt, pos, lifetime );
+    
+            particles.push(particle);
+
+            console.log("ADD PART");
+        }
+    }
+    
+
+    // p = p + (v + f; f = g * m)
+    for (var i=0; i < particles.length; i++)
+    {
+        //particles[i].v = particles[i].v.add(g);
+        //particles[i].sprite.position = particles[i].sprite.position.add(particles[i].v);
+
+        particles[i].lifetime -=  delta;
+
+        if (particles[i].lifetime <= 0)
+        {
+            scene.remove(particles[i].sprite);//extract sprite
+            particles.slice (i, 1); //delete
+
+            continue;
+        }
+
+        var gs = new THREE.Vector3();
+        gs.copy(g);
+
+        gs.multiplyScalar(particles[i].m);
+
+        gs.multiplyScalar(delta);
+        particles[i].v.add(gs);
+
+        var v = new THREE.Vector3(0, 0, 0);
+        var w = new THREE.Vector3(0, 0, 0);
+
+        w.copy(wind);
+        w.multiplyScalar(delta);
+
+        v.copy(particles[i].v);
+        v.add(w);
+
+        particles[i].sprite.position.add(v);
+    }
 }
