@@ -12,7 +12,11 @@ var geometry;
 
 var clock = new THREE.Clock();
 
+var rain = false;
+
 var sprite;
+
+//var wwind;
 
 var N = 256;
 
@@ -43,7 +47,10 @@ var objectList = [];
 
 var lmb = false;
 
-var sprt = null;
+var sprt1 = null;
+var sprt2 = null;
+var sprt3 = null;
+
 
 var g = new THREE.Vector3 (0, -9.8, 0); //gravitation
 var particles = [];
@@ -169,8 +176,8 @@ function init()
     loadModel('models/grade/', 'grade.obj', 'grade.mtl', 3, 'grade');
 
     
-    //cameraOrtho.add(sprt);    
-    //updateHUDSprite(sprt);
+    //cameraOrtho.add(sprt_1);    
+    //updateHUDSprite(sprt_1);
 
     addButtons();
 
@@ -271,7 +278,19 @@ function animate()
         sphereBrush(brushDirection, delta);
     }
 
+    
+
+    if (rain)
     emitter (delta);
+
+    for (var i = 0; i < particles.length; i++)
+    {
+        if (rain == true)
+        {   
+            particles[i].sprite.visible = true; 
+        }
+        else particles[i].sprite.visible = false;
+    }
 
     // Добавление функции на вызов, при перерисовки браузером страницы 
     requestAnimationFrame( animate ); 
@@ -422,10 +441,12 @@ function onDocumentMouseMove( event )
     mpos.x = event.clientX -( window.innerWidth / 2 );
     mpos.y = ( window.innerHeight / 2 ) - event.clientY;
 
-    if (sprt != null)
+    if (sprt1 != null)
     {
-        hitButton (mpos, sprt);
-        //clickButton (mpos, sprt);
+        hitButton (mpos, sprt1);
+        hitButton (mpos, sprt2);
+        hitButton (mpos, sprt3);
+        //clickButton (mpos, sprt_1);
     }
         
 
@@ -487,42 +508,46 @@ function onDocumentMouseMove( event )
     }
     else
     {
-        if ( intersects.length > 0 )
+        if (selected != null && lmb == true )
         {
-            if (selected != null && lmb == true )
+            var lastPos = new THREE.Vector3();
+            lastPos.copy(selected.position);
+
+            selected.position.copy(intersects[0].point);
+
+            selected.userData.box.setFromObject(selected);
+            //получение позиции центра объекта
+            var pos = new THREE.Vector3();
+            selected.userData.box.getCenter(pos);
+
+            //получение позиции центра объекта
+            selected.userData.obb.position.copy(pos);
+
+            //selected.userData.cube.position.copy(intersects[0].point);
+            selected.userData.cube.position.copy(pos);
+
+            for ( var i = 0; i < objectList.length; i++ )
             {
-                selected.position.copy(intersects[0].point);
-
-                selected.userData.box.setFromObject(selected);
-                //получение позиции центра объекта
-                var pos = new THREE.Vector3();
-                selected.userData.box.getCenter(pos);
-
-                //получение позиции центра объекта
-                selected.userData.obb.position.copy(pos);
-
-                //selected.userData.cube.position.copy(intersects[0].point);
-                selected.userData.cube.position.copy(pos);
-
-                for ( var i = 0; i < objectList.length; i++ )
+                if ( selected.userData.cube != objectList[i] )
                 {
-                    if ( selected.userData.cube != objectList[i] )
-                    {
-                        objectList[i].material.visible = false;
-                        objectList[i].material.color = {r:1, g:1, b:0};
+                    objectList[i].material.visible = false;
+                    objectList[i].material.color = {r:1, g:1, b:0};
 
-                        if ( intersect(selected.userData, 
-                            objectList[i].userData.model.userData) == true )
-                        {
-                            objectList[i].material.color = {r:1, g:0, b:0};
-                            //отмена скрытия объекта
-                            objectList[i].material.visible = true;
-                        }
+                    if ( intersect(selected.userData, 
+                        objectList[i].userData.model.userData) == true )
+                    {
+                        objectList[i].material.color = {r:1, g:0, b:0};
+                        //отмена скрытия объекта
+                        objectList[i].material.visible = true;
+                        selected.position.copy(lastPos);//
+                                selected.userData.box.setFromObject(selected);
+                                selected.userData.box.getCenter(pos); 
+                                selected.userData.obb.position.copy(pos);
+                                selected.userData.cube.position.copy(pos);
                     }
-                    
                 }
-            }
                 
+            }
         }
        
     }
@@ -606,10 +631,14 @@ function onDocumentMouseUp( event )
         mpos.x = event.clientX -( window.innerWidth / 2 );
         mpos.y = ( window.innerHeight / 2 ) - event.clientY;
 
-        if (sprt != null)
+        if (sprt1 != null)
         {
-            hitButton (mpos, sprt);
-            clickButton (mpos, sprt);
+            hitButton (mpos, sprt1);
+            hitButton (mpos, sprt2);
+            hitButton (mpos, sprt3);
+            clickButton (mpos, sprt1);
+            clickButton (mpos,sprt2);
+            clickButton (mpos,sprt3);
         }
     }
 }
@@ -646,8 +675,12 @@ function GUI()
     //массив переменных, ассоциированных с интерфейсом
     var params =
     {
-        sx: 0, sy: 0, sz: 0,
+        rotate:0,
+        scale: 0,
+       // sx: 0, sy: 0, sz: 0,
         brush: false,
+        rain: false,
+        wind: 0,
         addHouse: function() { addMesh('house') },
         addPalma: function() { addMesh('palma') },
         addGrade: function() { addMesh('grade') },
@@ -660,9 +693,48 @@ function GUI()
     //в окне интерфейса они будут представлены в виде слайдера
     //минимальное значение - 1, максимальное – 100, шаг – 1
     //listen означает, что изменение переменных будет отслеживаться
-    var meshSX = folder1.add( params, 'sx' ).min(1).max(100).step(1).listen();
-    var meshSY = folder1.add( params, 'sy' ).min(1).max(100).step(1).listen();
-    var meshSZ = folder1.add( params, 'sz' ).min(1).max(100).step(1).listen();
+
+    // var meshSX = folder1.add( params, 'sx' ).min(1).max(100).step(1).listen();
+    // var meshSY = folder1.add( params, 'sy' ).min(1).max(100).step(1).listen();
+    // var meshSZ = folder1.add( params, 'sz' ).min(1).max(100).step(1).listen();
+    
+    var meshSY = gui.add( params, 'rotate' ).min(1).max(1000).step(1).listen();//
+    meshSY.onChange(function(value) {
+        if (selected != null)
+        {
+            selected.userData.cube.rotation.set(0, (Math.PI/180) * value, 0);
+            selected.rotation.set(0, (Math.PI/180) * value, 0);
+
+            selected.userData.box.setFromObject(selected);
+            var pos = new THREE.Vector3();
+            selected.userData.box.getCenter(pos);
+            selected.userData.obb.position.copy(pos);
+            selected.userData.cube.position.copy(pos);
+        }
+    });
+
+    var meshScale = gui.add( params, 'scale' ).min(0.5).max(3).step(0.01).listen();//
+    meshScale.onChange(function(value) 
+    {
+        if (selected != null)
+        {
+            console.log(selected);
+            selected.scale.x = value;
+            selected.scale.y = value;
+            selected.scale.z = value;
+            selected.userData.box.setFromObject(selected);
+            
+            var pos = new THREE.Vector3();
+            selected.userData.box.getCenter(pos);
+            //получение размеров объекта
+            var size = new THREE.Vector3();
+            selected.userData.box.getSize(size);
+            //установка позиции и размера объекта в куб
+            selected.userData.cube.position.copy(pos);
+            selected.userData.cube.scale.set(size.x, size.y, size.z);
+        }
+    });
+
     //при запуске программы папка будет открыта
     folder1.open();
     //описание действий совершаемых при изменении ассоциированных значений
@@ -680,6 +752,20 @@ function GUI()
         circle.visible = value;
     });
 
+    var rainBegin = gui.add( params, 'rain' ).name('rain').listen();
+
+    rainBegin.onChange(function(value)
+    {
+        // value принимает значения true и false
+        rain = value;
+    });
+
+    var meshWIND = gui.add( params, 'wind' ).min(-100).max(100).step(1).listen();
+    meshWIND.onChange(function(value) {
+        xwind = value;
+        wind.set(xwind, 0, 0);
+    });
+
     //добавление кнопок, при нажатии которых будут вызываться функции addMesh
     //и delMesh соответственно. Функции описываются самостоятельно.
     gui.add( params, 'addHouse' ).name( "add house" );
@@ -689,9 +775,7 @@ function GUI()
 
     //при запуске программы интерфейс будет раскрыт
     gui.open();
-
 }
-
 
 function addMesh (name)
 {
@@ -788,44 +872,45 @@ function intersect(ob1, ob2)
     // OBB (this)
     for ( i = 0; i < 3; i++ )
     {
-    translation.setComponent( i, vector.dot( axisA[ i ] ) );
+        translation.setComponent( i, vector.dot( axisA[ i ] ) );
     }
     // generate a rotation matrix that transforms from world space to the
     // OBB's coordinate space
     for ( i = 0; i < 3; i++ )
     {
-    for ( var j = 0; j < 3; j++ )
-    {
-    rotationMatrix[ i ][ j ] = axisA[ i ].dot( axisB[ j ] );
-    rotationMatrixAbs[ i ][ j ] = Math.abs( rotationMatrix[ i ][ j ] ) + _EPSILON;
-    }
+        for ( var j = 0; j < 3; j++ )
+            {
+                rotationMatrix[ i ][ j ] = axisA[ i ].dot( axisB[ j ] );
+                rotationMatrixAbs[ i ][ j ] = Math.abs( rotationMatrix[ i ][ j ] ) + _EPSILON;
+            }
     }
     // test the three major axes of this OBB
     for ( i = 0; i < 3; i++ )
     {
-    vector.set( rotationMatrixAbs[ i ][ 0 ], rotationMatrixAbs[ i ][ 1 ], rotationMatrixAbs[ i ][ 2 ]
-    );
-    halfSizeA = ob1.obb.halfSize.getComponent( i );
-    halfSizeB = ob2.obb.halfSize.dot( vector );
-    
+        vector.set( rotationMatrixAbs[ i ][ 0 ], rotationMatrixAbs[ i ][ 1 ], rotationMatrixAbs[ i ][ 2 ]
+        );
+        halfSizeA = ob1.obb.halfSize.getComponent( i );
+        halfSizeB = ob2.obb.halfSize.dot( vector );
+        
 
-    if ( Math.abs( translation.getComponent( i ) ) > halfSizeA + halfSizeB )
-    {
-    return false;
-    }
+        if ( Math.abs( translation.getComponent( i ) ) > halfSizeA + halfSizeB )
+        {
+            return false;
+        }
     }
     // test the three major axes of other OBB
     for ( i = 0; i < 3; i++ )
     {
-    vector.set( rotationMatrixAbs[ 0 ][ i ], rotationMatrixAbs[ 1 ][ i ], rotationMatrixAbs[ 2 ][ i ] );
-    halfSizeA = ob1.obb.halfSize.dot( vector );
-    halfSizeB = ob2.obb.halfSize.getComponent( i );
-    vector.set( rotationMatrix[ 0 ][ i ], rotationMatrix[ 1 ][ i ], rotationMatrix[ 2 ][ i ] );
-    t = translation.dot( vector );
-    if ( Math.abs( t ) > halfSizeA + halfSizeB )
-    {
-    return false;
-    }
+        vector.set( rotationMatrixAbs[ 0 ][ i ], rotationMatrixAbs[ 1 ][ i ], rotationMatrixAbs[ 2 ][ i ] );
+        halfSizeA = ob1.obb.halfSize.dot( vector );
+        halfSizeB = ob2.obb.halfSize.getComponent( i );
+        vector.set( rotationMatrix[ 0 ][ i ], rotationMatrix[ 1 ][ i ], rotationMatrix[ 2 ][ i ] );
+        t = translation.dot( vector );
+        
+        if ( Math.abs( t ) > halfSizeA + halfSizeB )
+        {
+            return false;
+        }
     }
     // test the 9 different cross-axes
     // A.x <cross> B.x
@@ -834,9 +919,10 @@ function intersect(ob1, ob2)
     halfSizeB = ob2.obb.halfSize.y * rotationMatrixAbs[ 0 ][ 2 ] + ob2.obb.halfSize.z *
     rotationMatrixAbs[ 0 ][ 1 ];
     t = translation.z * rotationMatrix[ 1 ][ 0 ] - translation.y * rotationMatrix[ 2 ][ 0 ];
+    
     if ( Math.abs( t ) > halfSizeA + halfSizeB )
     {
-    return false;
+        return false;
     }
     // A.x < cross> B.y
     halfSizeA = ob1.obb.halfSize.y * rotationMatrixAbs[ 2 ][ 1 ] + ob1.obb.halfSize.z *
@@ -844,9 +930,10 @@ function intersect(ob1, ob2)
     halfSizeB = ob2.obb.halfSize.x * rotationMatrixAbs[ 0 ][ 2 ] + ob2.obb.halfSize.z *
     rotationMatrixAbs[ 0 ][ 0 ];
     t = translation.z * rotationMatrix[ 1 ][ 1 ] - translation.y * rotationMatrix[ 2 ][ 1 ];
+    
     if ( Math.abs( t ) > halfSizeA + halfSizeB )
     {
-    return false;
+        return false;
     }
 
     // A.x <cross> B.z
@@ -855,9 +942,10 @@ function intersect(ob1, ob2)
     halfSizeB = ob2.obb.halfSize.x * rotationMatrixAbs[ 0 ][ 1 ] + ob2.obb.halfSize.y *
     rotationMatrixAbs[ 0 ][ 0 ];
     t = translation.z * rotationMatrix[ 1 ][ 2 ] - translation.y * rotationMatrix[ 2 ][ 2 ];
+    
     if ( Math.abs( t ) > halfSizeA + halfSizeB )
     {
-    return false;
+        return false;
     }
     // A.y <cross> B.x
     halfSizeA = ob1.obb.halfSize.x * rotationMatrixAbs[ 2 ][ 0 ] + ob1.obb.halfSize.z *
@@ -865,9 +953,10 @@ function intersect(ob1, ob2)
     halfSizeB = ob2.obb.halfSize.y * rotationMatrixAbs[ 1 ][ 2 ] + ob2.obb.halfSize.z *
     rotationMatrixAbs[ 1 ][ 1 ];
     t = translation.x * rotationMatrix[ 2 ][ 0 ] - translation.z * rotationMatrix[ 0 ][ 0 ];
+    
     if ( Math.abs( t ) > halfSizeA + halfSizeB )
     {
-    return false;
+        return false;
     }
     // A.y <cross> B.y
     halfSizeA = ob1.obb.halfSize.x * rotationMatrixAbs[ 2 ][ 1 ] + ob1.obb.halfSize.z *
@@ -875,9 +964,10 @@ function intersect(ob1, ob2)
     halfSizeB = ob2.obb.halfSize.x * rotationMatrixAbs[ 1 ][ 2 ] + ob2.obb.halfSize.z *
     rotationMatrixAbs[ 1 ][ 0 ];
     t = translation.x * rotationMatrix[ 2 ][ 1 ] - translation.z * rotationMatrix[ 0 ][ 1 ];
+    
     if ( Math.abs( t ) > halfSizeA + halfSizeB )
     {
-    return false;
+        return false;
     }
     // A.y <cross> B.z
     halfSizeA = ob1.obb.halfSize.x * rotationMatrixAbs[ 2 ][ 2 ] + ob1.obb.halfSize.z *
@@ -885,9 +975,10 @@ function intersect(ob1, ob2)
     halfSizeB = ob2.obb.halfSize.x * rotationMatrixAbs[ 1 ][ 1 ] + ob2.obb.halfSize.y *
     rotationMatrixAbs[ 1 ][ 0 ];
     t = translation.x * rotationMatrix[ 2 ][ 2 ] - translation.z * rotationMatrix[ 0 ][ 2 ];
+    
     if ( Math.abs( t ) > halfSizeA + halfSizeB )
     {
-    return false;
+        return false;
     }
 
     // A.z <cross> B.x
@@ -896,9 +987,10 @@ function intersect(ob1, ob2)
     halfSizeB = ob2.obb.halfSize.y * rotationMatrixAbs[ 2 ][ 2 ] + ob2.obb.halfSize.z *
     rotationMatrixAbs[ 2 ][ 1 ];
     t = translation.y * rotationMatrix[ 0 ][ 0 ] - translation.x * rotationMatrix[ 1 ][ 0 ];
+    
     if ( Math.abs( t ) > halfSizeA + halfSizeB )
     {
-    return false;
+        return false;
     }
     // A.z <cross> B.y
     halfSizeA = ob1.obb.halfSize.x * rotationMatrixAbs[ 1 ][ 1 ] + ob1.obb.halfSize.y *
@@ -906,9 +998,10 @@ function intersect(ob1, ob2)
     halfSizeB = ob2.obb.halfSize.x * rotationMatrixAbs[ 2 ][ 2 ] + ob2.obb.halfSize.z *
     rotationMatrixAbs[ 2 ][ 0 ];
     t = translation.y * rotationMatrix[ 0 ][ 1 ] - translation.x * rotationMatrix[ 1 ][ 1 ];
+    
     if ( Math.abs( t ) > halfSizeA + halfSizeB )
     {
-    return false;
+        return false;
     }
     // A.z <cross> B.z
     halfSizeA = ob1.obb.halfSize.x * rotationMatrixAbs[ 1 ][ 2 ] + ob1.obb.halfSize.y *
@@ -916,9 +1009,10 @@ function intersect(ob1, ob2)
     halfSizeB = ob2.obb.halfSize.x * rotationMatrixAbs[ 2 ][ 1 ] + ob2.obb.halfSize.y *
     rotationMatrixAbs[ 2 ][ 0 ];
     t = translation.y * rotationMatrix[ 0 ][ 2 ] - translation.x * rotationMatrix[ 1 ][ 2 ];
+    
     if ( Math.abs( t ) > halfSizeA + halfSizeB )
     {
-    return false;
+        return false;
     }
     // no separating axis exists, so the two OBB don't intersect
     return true;
@@ -926,7 +1020,7 @@ function intersect(ob1, ob2)
 
 
 //function addSprite ( name1, name2, Click )
-function addButton ( name1, name2, Click )
+function addButton ( name1, name2, Click, pos )
 {
     var texture1 = loader.load(name1)
     var material1 = new THREE.SpriteMaterial( { map: texture1 } );
@@ -942,19 +1036,19 @@ function addButton ( name1, name2, Click )
     sprite = new THREE.Sprite( material1);
     sprite.center.set( 0.0, 1.0 );
     sprite.scale.set( 80, 64, 1 );
-    //sprite.position.set( 0, 0, 1 );
+    sprite.position.set(-window.innerWidth/2 - pos , window.innerHeight / 2, 1 );
 
     //return sprite;
 
     sceneOrtho.add(sprite);
     //cameraOrtho.add(sprite);
-    updateHUDSprite(sprite);
+    updateHUDSprite(sprite,pos);
 
     var SSprite = {};
     SSprite.sprite = sprite;
     SSprite.mat1 = material1;
     SSprite.mat2 = material2;
-    //SSprite.click =  sprtClick;
+    //SSprite.click =  sprt_1Click;
     SSprite.click =  Click;
       
 
@@ -963,17 +1057,21 @@ function addButton ( name1, name2, Click )
 
 
 //функция для обновления позиции спрайта
-function updateHUDSprite(sprite)
+function updateHUDSprite(sprite,pos)
 {
  var width = window.innerWidth / 2;
- var height = window.innerHeight / 2;
+ var height = window.innerHeight / 2;  // изменение позиции кнопки тут 
 
- sprite.position.set( -width, height, 1 ); // левый верхний угол экрана
+ sprite.position.set( -width + pos, height, 1 ); // левый верхний угол экрана
 }
 
 function addButtons()
 {
-    sprt = addButton ( 'pics/sprites/house.jpg', 'pics/sprites/house2.jpg', houseClick );
+    sprt1 = addButton ( 'pics/sprites/house.jpg', 'pics/sprites/house3.jpg', houseClick, 0 );
+    
+    sprt2 = addButton ( 'pics/sprites/palma.jpg', 'pics/sprites/palma3.jpg', palmClick, 100 );
+
+    sprt3 = addButton ( 'pics/sprites/grade.jpg', 'pics/sprites/grade3.jpg', gradeclick, 200 );
 }
 
 //moustPos = {x: 0, y:0}
@@ -1016,6 +1114,18 @@ function houseClick()
 {
     addMesh('house');
 }
+
+function palmClick()
+{
+    addMesh('palma');
+}
+
+function gradeclick()
+{
+    addMesh('grade');
+}
+
+
 
 function createSpriteMaterial (name)
 {
@@ -1073,7 +1183,7 @@ function addSprite ( name, pos, lifetime )
     SSprite.sprite = sprite;
     //SSprite.mat1 = material1;
     //SSprite.mat2 = material2;
-    //SSprite.click =  sprtClick;
+    //SSprite.click =  sprt_1Click;
     //SSprite.click =  Click;
     SSprite.v = new THREE.Vector3 (0, 0, 0);
     SSprite.m = (Math.random() * 3) + 1;
